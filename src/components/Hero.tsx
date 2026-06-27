@@ -9,12 +9,18 @@ const letters = "Cocktail".split("");
 // Each image gets its own scattered "landing spot" (in world units,
 // roughly centered but offset so they don't all converge to one point)
 // plus which lane (left/right) it belongs to for the exit.
+// Repeating images makes the stream last longer.
 const panels = [
-  { src: "/Hero/17262676116_8c01038595_o.webp", x: -180, y: 90, lane: "left" as const },
-  { src: "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp", x: 170, y: 130, lane: "right" as const },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -70, y: -50, lane: "left" as const },
-  { src: "/Hero/d8ad7528191005.5637110d93902.jpg", x: 230, y: -30, lane: "right" as const },
-  { src: "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg", x: -220, y: 10, lane: "left" as const },
+  { src: "/Hero/17262676116_8c01038595_o.webp", x: -260, y: 140, z: 20, lane: "left" as const },
+  { src: "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp", x: 220, y: 170, z: 80, lane: "right" as const },
+  { src: "/Hero/black-and-white-1282260_640.jpg", x: -110, y: -100, z: -30, lane: "left" as const },
+  { src: "/Hero/d8ad7528191005.5637110d93902.jpg", x: 270, y: -20, z: 60, lane: "right" as const },
+  { src: "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg", x: -240, y: 20, z: 120, lane: "left" as const },
+  { src: "/Hero/17262676116_8c01038595_o.webp", x: -140, y: 90, z: -50, lane: "left" as const },
+  { src: "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp", x: 190, y: 120, z: 40, lane: "right" as const },
+  { src: "/Hero/black-and-white-1282260_640.jpg", x: -50, y: -140, z: -20, lane: "left" as const },
+  { src: "/Hero/d8ad7528191005.5637110d93902.jpg", x: 280, y: -50, z: 100, lane: "right" as const },
+  { src: "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg", x: -200, y: 50, z: 10, lane: "left" as const },
 ];
 
 export default function Hero() {
@@ -26,7 +32,6 @@ export default function Hero() {
 
     const canvasContainer = canvasRef.current;
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#000000");
 
     const camera = new THREE.PerspectiveCamera(
       42,
@@ -39,10 +44,12 @@ export default function Hero() {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
-    renderer.setClearColor(0x000000, 1);
+    renderer.setClearColor(0x000000, 0);
+    renderer.domElement.style.background = "transparent";
     renderer.domElement.style.position = "absolute";
     renderer.domElement.style.top = "0";
     renderer.domElement.style.left = "0";
+    renderer.domElement.style.zIndex = "10";
     canvasContainer.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.5));
@@ -55,7 +62,7 @@ export default function Hero() {
     const belowTextY = -worldHeight * 1.05;
 
     const meshes = panels.map((panel) => {
-      const geometry = new THREE.PlaneGeometry(500, 650, 16, 16);
+      const geometry = new THREE.PlaneGeometry(500, 500, 16, 16);
       const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
       const mesh = new THREE.Mesh(geometry, material);
       // rises straight up from below into its own scattered landing spot
@@ -88,61 +95,108 @@ export default function Hero() {
       stagger: 0.12,
     });
 
-    // ---- TWO INDEPENDENT, SIMULTANEOUS, CONTINUOUS LANES ----
     const enterDuration = 0.9;
-    const holdDuration = 0.35;
-    const exitDuration = 0.55;
-    const cycleDuration = enterDuration + holdDuration + exitDuration;
+    const exitDuration = 1.4;
 
-    const leftItems = meshes.filter((m) => m.panel.lane === "left");
-    const rightItems = meshes.filter((m) => m.panel.lane === "right");
+    const masterTimeline = gsap.timeline();
+    let latestExitEnd = 0;
 
-    const allTimelines: gsap.core.Timeline[] = [];
-    const allDelayedCalls: gsap.core.Tween[] = [];
+    const spawnData = meshes.map(({ mesh, panel }, index) => {
+      const startDelay = 0.25 + index * 0.14;
+      return {
+        mesh,
+        panel,
+        startDelay,
+        exitX: panel.x + (panel.lane === "left" ? -1 : 1) * worldWidth * 0.55,
+        index,
+      };
+    });
 
-    const launchLane = (items: typeof meshes, laneSide: -1 | 1) => {
-      const laneStagger = cycleDuration / items.length;
+    spawnData.forEach(({ mesh, panel, startDelay, exitX, index }) => {
+      const entryEnd = startDelay + enterDuration;
+      const floatDelay = entryEnd;
+      const floatDuration = 0.28;
+      const exitDelay = floatDelay + floatDuration;
+      const exitEnd = exitDelay + exitDuration;
+      latestExitEnd = Math.max(latestExitEnd, exitEnd);
+      const floatY = panel.y + (index % 2 === 0 ? 18 : -16);
 
-      items.forEach(({ mesh, panel }, i) => {
-        const exitX = panel.x + laneSide * worldWidth * 0.55;
+      masterTimeline.set(mesh.position, { x: panel.x, y: belowTextY, z: panel.z - 320 }, startDelay);
+      masterTimeline.set(mesh.scale, { x: 0.05, y: 0.05, z: 0.05 }, startDelay);
+      masterTimeline.set(mesh.material, { opacity: 0 }, startDelay);
 
-        const buildCycleTl = () => {
-          const tl = gsap.timeline({ repeat: -1 });
+      // ENTER: rise into place
+      masterTimeline.to(
+        mesh.position,
+        { y: panel.y, z: panel.z, duration: enterDuration, ease: "power3.out", overwrite: "auto" },
+        startDelay
+      );
+      masterTimeline.to(
+        mesh.scale,
+        { x: 1, y: 1, z: 1, duration: enterDuration, ease: "power3.out", overwrite: "auto" },
+        startDelay
+      );
+      masterTimeline.to(
+        mesh.material,
+        { opacity: 1, duration: enterDuration * 0.65, ease: "power2.out", overwrite: "auto" },
+        startDelay
+      );
 
-          tl.set(mesh.position, { x: panel.x, y: belowTextY, z: -250 });
-          tl.set(mesh.scale, { x: 0.05, y: 0.05, z: 0.05 });
-          tl.set(mesh.material, { opacity: 0 });
+      // FLOAT: a brief drift before the slow exit begins
+      masterTimeline.to(
+        mesh.position,
+        { y: floatY, duration: floatDuration, ease: "sine.inOut", overwrite: "auto" },
+        floatDelay
+      );
 
-          // ENTER: rises straight up from below the text into its own scattered spot
-          tl.to(mesh.position, { y: panel.y, z: 0, duration: enterDuration, ease: "power3.out" }, 0);
-          tl.to(mesh.scale, { x: 1, y: 1, z: 1, duration: enterDuration, ease: "power3.out" }, 0);
-          tl.to(mesh.material, { opacity: 1, duration: enterDuration * 0.65, ease: "power2.out" }, 0);
+      // EXIT: slowly shoot outward and fade
+      masterTimeline.to(
+        mesh.position,
+        { x: exitX, z: 1180, duration: exitDuration, ease: "power4.in", overwrite: "auto" },
+        exitDelay
+      );
+      masterTimeline.to(
+        mesh.material,
+        { opacity: 0, duration: exitDuration * 0.7, ease: "power2.in", overwrite: "auto" },
+        exitDelay + exitDuration * 0.25
+      );
+    });
 
-          // HOLD at its scattered spot
-          tl.to({}, { duration: holdDuration });
-
-          // SHOOT / EXIT: rushes toward camera along this lane's direction,
-          // perspective balloons it on its own, fades right before the lens
-          tl.to(mesh.position, { x: exitX, z: 1180, duration: exitDuration, ease: "power4.in" }, ">");
-          tl.to(
-            mesh.material,
-            { opacity: 0, duration: exitDuration * 0.4, ease: "power2.in" },
-            `>-${exitDuration * 0.4}`
-          );
-
-          return tl;
-        };
-
-        const dc = gsap.delayedCall(0.4 + i * laneStagger, () => {
-          allTimelines.push(buildCycleTl());
-        });
-        allDelayedCalls.push(dc);
-      });
-    };
-
-    // both lanes start at the same base moment and run forever, independently
-    launchLane(leftItems, -1);
-    launchLane(rightItems, 1);
+    const returnDelay = latestExitEnd + 0.25;
+    masterTimeline.to(
+      meshes.map(({ mesh }) => mesh.position),
+      {
+        x: (i: number) => panels[i].x,
+        y: (i: number) => panels[i].y,
+        z: (i: number) => panels[i].z,
+        duration: 0.9,
+        ease: "power4.out",
+        stagger: 0.08,
+      } as any,
+      returnDelay
+    );
+    masterTimeline.to(
+      meshes.map(({ mesh }) => mesh.scale),
+      {
+        x: 1,
+        y: 1,
+        z: 1,
+        duration: 0.9,
+        ease: "power4.out",
+        stagger: 0.08,
+      } as any,
+      returnDelay
+    );
+    masterTimeline.to(
+      meshes.map(({ mesh }) => mesh.material),
+      {
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.out",
+        stagger: 0.08,
+      },
+      returnDelay
+    );
 
     const resize = () => {
       const { clientWidth, clientHeight } = canvasContainer;
@@ -155,8 +209,7 @@ export default function Hero() {
     return () => {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(frameId);
-      allTimelines.forEach((tl) => tl.kill());
-      allDelayedCalls.forEach((dc) => dc.kill());
+      masterTimeline.kill();
       renderer.dispose();
       meshes.forEach(({ mesh }) => {
         mesh.geometry.dispose();
@@ -173,7 +226,7 @@ export default function Hero() {
       className="w-full bg-black relative overflow-hidden"
       style={{ height: "100vh" }}
     >
-      <div ref={canvasRef} className="absolute inset-0" />
+      <div ref={canvasRef} className="absolute inset-0 z-10" />
       <h1
         ref={textRef}
         className="
@@ -182,13 +235,14 @@ export default function Hero() {
           font-black
           leading-[0.8]
           tracking-[-0.08em]
-          text-[20vw]
+          text-[15vw]
           select-none
           uppercase
           whitespace-nowrap
           absolute
           left-10
           bottom-10
+          z-20
         "
       >
         {letters.map((letter, index) => (
