@@ -235,13 +235,13 @@ export default function Hero() {
           font-black
           leading-[0.8]
           tracking-[-0.08em]
-          text-[15vw]
+          text-[10vw]
           select-none
           uppercase
           whitespace-nowrap
           absolute
-          left-10
-          bottom-10
+          left-30
+          bottom-40
           z-20
         "
       >
