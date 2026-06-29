@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import {
   revealFromBottom,
   revealFromLeft,
@@ -11,9 +12,10 @@ import {
   createFloatingAnimation,
   createDepthAnimation,
   createSnakePathAnimation,
+  createMotionPathTrain,
 } from "@/utils/animations";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
 
 type AnimationType =
   | "fromBottom"
@@ -135,4 +137,39 @@ export const useSnakeScroll = (options: UseSnakeScrollOptions) => {
   }, [options.scrollDistance]);
 
   return elementRef;
+};
+
+/**
+ * Animates a set of "train car" elements along a fixed SVG path in an
+ * infinite, staggered loop (GSAP MotionPathPlugin). Autoplay — no scroll
+ * trigger involved.
+ *
+ * Usage:
+ *   const carsRef = useRef<HTMLDivElement[]>([]);
+ *   useMotionPathTrain({ pathSelector: "#trainPath", carsRef, duration: 6, stagger: 0.25 });
+ */
+interface UseMotionPathTrainOptions {
+  pathSelector: string;
+  carsRef: React.RefObject<HTMLElement[]>;
+  duration?: number;
+  stagger?: number;
+}
+
+export const useMotionPathTrain = (options: UseMotionPathTrainOptions) => {
+  useEffect(() => {
+    const cars = options.carsRef.current;
+    if (!cars || cars.length === 0) return;
+
+    const tweens = createMotionPathTrain(
+      cars,
+      options.pathSelector,
+      options.duration ?? 6,
+      options.stagger ?? 0.25
+    );
+
+    return () => {
+      tweens.forEach((t) => t.kill());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.pathSelector, options.duration, options.stagger]);
 };

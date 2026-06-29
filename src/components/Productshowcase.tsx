@@ -3,88 +3,53 @@
 import { useRef } from "react";
 import { useLayoutEffect } from "react";
 import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { revealTextLines } from "@/utils/animations";
+import { useMotionPathTrain } from "@/hooks/useGsapAnimation";
 
-gsap.registerPlugin(ScrollTrigger);
-
-// 7 cards — stacked tightly, slight fan/rotation for the bento look.
-// Replace src with your real product/CGI renders.
-const cards = [
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -10, y: 10, rotate: -6 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: 10, y: -6, rotate: 4 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -6, y: -14, rotate: -3 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: 14, y: 8, rotate: 7 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -14, y: 4, rotate: -8 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: 8, y: -10, rotate: 5 },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: 0, y: 0, rotate: 0 }, // front-most "hero" card
+// Same source images, cycled to build a 24-card train so the path
+// always looks populated end-to-end. Replace src with real CGI renders
+// whenever — the cycling logic doesn't care how many unique images exist.
+const sourceImages = [
+  "/Hero/black-and-white-1282260_640.jpg",
+  "/Hero/17262676116_8c01038595_o.webp",
+  "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
+  "/Hero/d8ad7528191005.5637110d93902.jpg",
+  "/Hero/17262676116_8c01038595_o.webp",
+  "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
+  "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg",
 ];
+
+const TRAIN_SIZE = 24;
+const trainCars = Array.from({ length: TRAIN_SIZE }, (_, i) => ({
+  src: sourceImages[i % sourceImages.length],
+}));
 
 export default function ProductShowcase() {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const stackRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<HTMLSpanElement[]>([]);
+  const carsRef = useRef<HTMLDivElement[]>([]);
 
   useLayoutEffect(() => {
     const section = sectionRef.current;
-    const stack = stackRef.current;
-    if (!section || !stack) return;
+    if (!section) return;
 
     const ctx = gsap.context(() => {
-      // --- Text lines: rise from bottom on enter ---
+      // --- Text lines: rise from bottom on enter (unchanged) ---
       revealTextLines(lineRefs.current, 0.15);
-
-      // --- Build a smooth "ulto-S" path from bottom-left to top-right ---
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-
-      // Start: bottom-left corner. End: top-right corner.
-      // The curve dips through the middle like a reversed "S" —
-      // first arcs slightly right-then-left, then sweeps up to the right.
-      const startX = -vw * 0.34; // from center, how far left the stack starts
-      const startY = vh * 0.34; // from center, how far down the stack starts
-      const endX = vw * 0.34; // how far right it ends
-      const endY = -vh * 0.34; // how far up it ends
-
-      // Sequential waypoints the stack passes through to create the S-bend.
-      const path = [
-        { x: startX, y: startY, rotate: -6 }, // start (bottom-left)
-        { x: startX * 0.45, y: startY * 0.2, rotate: -2 }, // curve inward/up first
-        { x: 0, y: vh * 0.06, rotate: 0 }, // crosses center, slight dip (the "S" bend)
-        { x: endX * 0.55, y: endY * 0.35, rotate: 3 }, // sweeps up toward the right
-        { x: endX, y: endY, rotate: 6 }, // end (top-right)
-      ];
-
-      gsap.set(stack, { x: path[0].x, y: path[0].y, rotate: path[0].rotate });
-
-      const tl = gsap.timeline();
-      for (let i = 1; i < path.length; i++) {
-        tl.to(
-          stack,
-          {
-            x: path[i].x,
-            y: path[i].y,
-            rotate: path[i].rotate,
-            ease: "none",
-            duration: 1,
-          },
-          i - 1
-        );
-      }
-
-      ScrollTrigger.create({
-        trigger: section,
-        start: "top top",
-        end: "+=2200",
-        scrub: 1,
-        pin: true,
-        anticipatePin: 1,
-        animation: tl,
-      });
     }, section);
 
     return () => ctx.revert();
   }, []);
+
+  // --- Infinite MotionPath train along the wavy SVG curve below ---
+  // Autoplay, no ScrollTrigger — same API shape as the GSAP MotionPathPlugin
+  // demo (gsap.com/docs/v3/Plugins/MotionPathPlugin), repeat: -1, no yoyo.
+  useMotionPathTrain({
+    pathSelector: "#trainPath",
+    carsRef,
+    duration: 7,
+    stagger: 0.22,
+  });
 
   return (
     <section
@@ -127,34 +92,41 @@ export default function ProductShowcase() {
         </h2>
       </div>
 
-      {/* Bento card stack — travels bottom-left -> top-right along an "S" curve */}
-      <div
-        ref={stackRef}
-        className="absolute top-1/2 left-1/2 z-20"
-        style={{ marginLeft: "-170px", marginTop: "-220px" }} // half of card box, to center the transform origin
+      {/* Invisible SVG path the train follows — wavy S-curve,
+          bottom-left to top-right, viewBox matches the viewport so
+          the path scales with the section. */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox="0 0 1600 900"
+        preserveAspectRatio="none"
       >
-        <div className="relative w-[280px] h-[360px] md:w-[340px] md:h-[440px]">
-          {cards.map((card, i) => (
-            <div
-              key={i}
-              className="absolute inset-0 rounded-3xl overflow-hidden shadow-2xl border border-white/10"
-              style={{
-                transform: `translate(${card.x}px, ${card.y}px) rotate(${card.rotate}deg)`,
-                zIndex: i,
-              }}
-            >
-              {/* Using plain <img> here on purpose: these are dynamic
-                  decorative renders, not LCP-critical content. Swap
-                  for next/image once final asset paths are locked in. */}
-              <img
-                src={card.src}
-                alt=""
-                className="w-full h-full object-cover"
-                draggable={false}
-              />
-            </div>
-          ))}
-        </div>
+        <path
+          id="trainPath"
+          d="M -100,750 C 250,650 350,500 550,480 C 750,460 700,300 950,260 C 1150,230 1300,150 1700,120"
+          fill="none"
+          stroke="none"
+        />
+      </svg>
+
+      {/* Train cars — each one a small image card animated along #trainPath */}
+      <div className="absolute inset-0 z-20">
+        {trainCars.map((card, i) => (
+          <div
+            key={i}
+            ref={(el) => {
+              if (el) carsRef.current[i] = el;
+            }}
+            className="absolute w-[90px] h-[120px] md:w-[130px] md:h-[170px] rounded-xl overflow-hidden shadow-2xl border border-white/10"
+            style={{ left: 0, top: 0 }}
+          >
+            <img
+              src={card.src}
+              alt=""
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          </div>
+        ))}
       </div>
     </section>
   );

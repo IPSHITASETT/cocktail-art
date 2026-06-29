@@ -140,3 +140,36 @@ export const revealTextLines = (
   });
   return tl;
 };
+
+/**
+ * Drives an infinite "conveyor train" of elements along an SVG motion path —
+ * exact GSAP MotionPathPlugin demo API (gsap.com/docs/v3/Plugins/MotionPathPlugin),
+ * just repeat: -1 / no yoyo, plus a tight per-item stagger so 20+ images read
+ * as one continuous stream flowing along the curve.
+ *
+ * @param els           array of elements (the train "cars") to animate
+ * @param pathSelector  CSS selector of the SVG <path> to follow (e.g. "#trainPath")
+ * @param duration      time (s) for ONE element to travel the full path
+ * @param stagger       time (s) between each element's start (tight gap = small number)
+ */
+export const createMotionPathTrain = (
+  els: Element[],
+  pathSelector: string,
+  duration = 6,
+  stagger = 0.25
+): gsap.core.Tween[] => {
+  return els.map((el, i) =>
+    gsap.to(el, {
+      duration,
+      repeat: -1,
+      ease: "power1.inOut",
+      delay: i * stagger,
+      motionPath: {
+        path: pathSelector,
+        align: pathSelector,
+        autoRotate: true,
+        alignOrigin: [0.5, 0.5],
+      },
+    })
+  );
+};
