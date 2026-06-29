@@ -1,69 +1,79 @@
 "use client";
 
-import { useRef } from "react";
-import { useLayoutEffect } from "react";
+import { useRef, useLayoutEffect } from "react";
 import { gsap } from "gsap";
+import { MotionPathPlugin } from "gsap/MotionPathPlugin";
 import { revealTextLines } from "@/utils/animations";
-import { useMotionPathTrain } from "@/hooks/useGsapAnimation";
 
-// Same source images, cycled to build a 24-card train so the path
-// always looks populated end-to-end. Replace src with real CGI renders
-// whenever — the cycling logic doesn't care how many unique images exist.
+gsap.registerPlugin(MotionPathPlugin);
+
 const sourceImages = [
   "/Hero/black-and-white-1282260_640.jpg",
   "/Hero/17262676116_8c01038595_o.webp",
   "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
   "/Hero/d8ad7528191005.5637110d93902.jpg",
+  "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg",
   "/Hero/17262676116_8c01038595_o.webp",
   "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
-  "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg",
 ];
 
-const TRAIN_SIZE = 24;
+const TRAIN_SIZE = 13;
+
 const trainCars = Array.from({ length: TRAIN_SIZE }, (_, i) => ({
   src: sourceImages[i % sourceImages.length],
 }));
 
 export default function ProductShowcase() {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const lineRefs = useRef<HTMLSpanElement[]>([]);
-  const carsRef = useRef<HTMLDivElement[]>([]);
+  const lineRefs   = useRef<HTMLSpanElement[]>([]);
+  const carsRef    = useRef<HTMLDivElement[]>([]);
 
   useLayoutEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
 
     const ctx = gsap.context(() => {
-      // --- Text lines: rise from bottom on enter (unchanged) ---
+      // Text reveal
       revealTextLines(lineRefs.current, 0.15);
+
+      // Motion path train
+      carsRef.current.forEach((car, i) => {
+        if (!car) return;
+
+        const startProgress = i / TRAIN_SIZE;
+
+        gsap.set(car, { xPercent: -50, yPercent: -50 });
+
+        gsap.to(car, {
+          motionPath: {
+            path: "#trainPath",
+            align: "#trainPath",
+            alignOrigin: [0.5, 0.5],
+            autoRotate: true,
+            start: startProgress,
+            end: startProgress + 1,
+          },
+          duration: 10,
+          ease: "none",
+          repeat: -1,
+        });
+      });
     }, section);
 
     return () => ctx.revert();
   }, []);
-
-  // --- Infinite MotionPath train along the wavy SVG curve below ---
-  // Autoplay, no ScrollTrigger — same API shape as the GSAP MotionPathPlugin
-  // demo (gsap.com/docs/v3/Plugins/MotionPathPlugin), repeat: -1, no yoyo.
-  useMotionPathTrain({
-    pathSelector: "#trainPath",
-    carsRef,
-    duration: 7,
-    stagger: 0.22,
-  });
 
   return (
     <section
       ref={sectionRef}
       className="relative w-full h-screen bg-black overflow-hidden"
     >
-      {/* Heading */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center pointer-events-none">
-        <h2 className="font-black uppercase leading-[0.95] tracking-tight text-white text-[6vw] whitespace-nowrap">
+      {/* Heading — left aligned, above cards */}
+      <div className="absolute left-[4%] top-1/2 -translate-y-1/2 z-40 pointer-events-none">
+        <h2 className="font-black uppercase leading-[0.95] tracking-tight text-white text-[6.5vw]">
           <span className="block overflow-hidden">
             <span
-              ref={(el) => {
-                if (el) lineRefs.current[0] = el;
-              }}
+              ref={(el) => { if (el) lineRefs.current[0] = el; }}
               className="inline-block"
             >
               Revolutionizing
@@ -71,9 +81,7 @@ export default function ProductShowcase() {
           </span>
           <span className="block overflow-hidden italic font-light">
             <span
-              ref={(el) => {
-                if (el) lineRefs.current[1] = el;
-              }}
+              ref={(el) => { if (el) lineRefs.current[1] = el; }}
               className="inline-block"
             >
               Product
@@ -81,9 +89,7 @@ export default function ProductShowcase() {
           </span>
           <span className="block overflow-hidden">
             <span
-              ref={(el) => {
-                if (el) lineRefs.current[2] = el;
-              }}
+              ref={(el) => { if (el) lineRefs.current[2] = el; }}
               className="inline-block"
             >
               Visualization
@@ -92,32 +98,36 @@ export default function ProductShowcase() {
         </h2>
       </div>
 
-      {/* Invisible SVG path the train follows — wavy S-curve,
-          bottom-left to top-right, viewBox matches the viewport so
-          the path scales with the section. */}
+      {/*
+        SVG path — matches your drawn curve:
+        starts bottom-left → dips into U-bowl → shoots up steeply
+        through center → flattens out to top-right
+      */}
       <svg
         className="absolute inset-0 w-full h-full pointer-events-none"
-        viewBox="0 0 1600 900"
+        viewBox="0 0 1200 520"
         preserveAspectRatio="none"
       >
         <path
           id="trainPath"
-          d="M -100,750 C 250,650 350,500 550,480 C 750,460 700,300 950,260 C 1150,230 1300,150 1700,120"
+          d="M -180,320 C 0,420 180,520 360,500 C 480,490 520,440 560,320 C 590,220 610,100 700,40 C 820,-30 1000,20 1400,30"
           fill="none"
           stroke="none"
         />
       </svg>
 
-      {/* Train cars — each one a small image card animated along #trainPath */}
-      <div className="absolute inset-0 z-20">
+      {/* Train cards */}
+      <div className="absolute inset-0 z-10">
         {trainCars.map((card, i) => (
           <div
             key={i}
-            ref={(el) => {
-              if (el) carsRef.current[i] = el;
+            ref={(el) => { if (el) carsRef.current[i] = el; }}
+            className="absolute w-[130px] h-[170px] md:w-[185px] md:h-[260px] rounded-2xl overflow-hidden"
+            style={{
+              left: 0,
+              top: 0,
+              border: "1.5px solid rgba(255,255,255,0.12)",
             }}
-            className="absolute w-[90px] h-[120px] md:w-[130px] md:h-[170px] rounded-xl overflow-hidden shadow-2xl border border-white/10"
-            style={{ left: 0, top: 0 }}
           >
             <img
               src={card.src}
