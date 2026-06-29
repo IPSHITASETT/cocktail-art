@@ -89,3 +89,54 @@ export const createDepthAnimation = (
     yoyo: true,
   });
 };
+
+/**
+ * Creates a scroll-scrubbed "snake path" motion for a single element
+ * (used here on the bento card-stack wrapper). The element travels
+ * from bottom-left to top-right through a subtle zigzag — defined as
+ * a series of waypoints — instead of a straight diagonal line.
+ *
+ * Returns a gsap.core.Timeline so the caller can hook it up to a
+ * ScrollTrigger with `scrub` for direct scroll-control.
+ *
+ * @param el        the element to move (e.g. the stack wrapper div)
+ * @param waypoints array of {x, y, rotate?} in px, relative offsets
+ *                  from the element's starting position
+ */
+export const createSnakePathAnimation = (
+  el: Element,
+  waypoints: { x: number; y: number; rotate?: number }[]
+): gsap.core.Timeline => {
+  const tl = gsap.timeline();
+
+  waypoints.forEach((point, i) => {
+    tl.to(el, {
+      x: point.x,
+      y: point.y,
+      rotate: point.rotate ?? 0,
+      ease: "none", // linear — scrub controls the easing via scroll
+      duration: 1,
+    }, i);
+  });
+
+  return tl;
+};
+
+/**
+ * Staggered text-line reveal (bottom -> up), used for the
+ * "Revolutionizing / Product / Visualization" heading lines.
+ */
+export const revealTextLines = (
+  els: Element[],
+  stagger = 0.15
+): gsap.core.Timeline => {
+  const tl = gsap.timeline();
+  tl.from(els, {
+    y: "100%",
+    opacity: 0,
+    duration: 1,
+    ease: "power3.out",
+    stagger,
+  });
+  return tl;
+};
