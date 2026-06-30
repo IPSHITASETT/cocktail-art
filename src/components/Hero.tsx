@@ -8,19 +8,28 @@ const letters = "OVA".split("");
 
 // Each image gets its own scattered "landing spot" (in world units,
 // roughly centered but offset so they don't all converge to one point)
-// plus which lane (left/right) it belongs to for the exit.
-// Repeating images makes the stream last longer.
+// plus which lane (left/right) it belongs to for the exit, and its
+// final scale/opacity so one image reads as the large "hero" panel
+// and the rest sit smaller and fainter behind it.
 const panels = [
-  { src: "/Hero/17262676116_8c01038595_o.webp", x: -260, y: 140, z: 20, lane: "left" as const },
-  { src: "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp", x: 220, y: 170, z: 80, lane: "right" as const },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -110, y: -100, z: -30, lane: "left" as const },
-  { src: "/Hero/d8ad7528191005.5637110d93902.jpg", x: 270, y: -20, z: 60, lane: "right" as const },
-  { src: "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg", x: -240, y: 20, z: 120, lane: "left" as const },
-  { src: "/Hero/17262676116_8c01038595_o.webp", x: -140, y: 90, z: -50, lane: "left" as const },
-  { src: "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp", x: 190, y: 120, z: 40, lane: "right" as const },
-  { src: "/Hero/black-and-white-1282260_640.jpg", x: -50, y: -140, z: -20, lane: "left" as const },
-  { src: "/Hero/d8ad7528191005.5637110d93902.jpg", x: 280, y: -50, z: 100, lane: "right" as const },
-  { src: "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg", x: -200, y: 50, z: 10, lane: "left" as const },
+  // Large box — top-left (your box 1)
+  { src: "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp", x: -400, y: 30, z: 200, lane: "left" as const, scale: 1, opacity: 1 },
+  // Medium box — overlapping right/below box 1 (your box 2)
+  { src: "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp", x: -70, y: -55, z: 100, lane: "right" as const, scale: 0.9, opacity: 0.95 },
+  // Smaller box — overlapping box 2, further down-right (your box 3)
+  { src: "/Hero/places-to-visit-in-mumbai-e1547692412795.jpg", x: 20, y: -20, z: 20, lane: "left" as const, scale: 0.65, opacity: 0.9 },
+  // Small box — top-right, separate (your box 4)
+  { src: "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp", x: 340, y: 20, z: -40, lane: "right" as const, scale: 0.45, opacity: 0.85 },
+  // Large-ish box — right side, separate (your box 5)
+  { src: "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp", x: 235, y: -55, z: -100, lane: "left" as const, scale: 0.55, opacity: 0.85 },
+  // Tiny box — bottom-right, separate (your box 6)
+  { src: "/Hero/places-to-visit-in-mumbai-e1547692412795.jpg", x: 145, y: -110, z: -160, lane: "right" as const, scale: 0.3, opacity: 0.75 },
+
+  // Repeats to keep the stream going — reuse the same six zones, slightly offset
+  { src: "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp", x: -180, y: 50, z: -220, lane: "left" as const, scale: 1.1, opacity: 0.55 },
+  { src: "/Hero/places-to-visit-in-mumbai-e1547692412795.jpg", x: -50, y: -10, z: -280, lane: "right" as const, scale: 0.8, opacity: 0.5 },
+  { src: "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp", x: 155, y: 35, z: -340, lane: "left" as const, scale: 0.4, opacity: 0.45 },
+  { src: "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp", x: 250, y: -40, z: -400, lane: "right" as const, scale: 0.5, opacity: 0.4 },
 ];
 
 export default function Hero() {
@@ -133,12 +142,12 @@ export default function Hero() {
       );
       masterTimeline.to(
         mesh.scale,
-        { x: 1, y: 1, z: 1, duration: enterDuration, ease: "power3.out", overwrite: "auto" },
+        { x: panel.scale, y: panel.scale, z: panel.scale, duration: enterDuration, ease: "power3.out", overwrite: "auto" },
         startDelay
       );
       masterTimeline.to(
         mesh.material,
-        { opacity: 1, duration: enterDuration * 0.65, ease: "power2.out", overwrite: "auto" },
+        { opacity: panel.opacity, duration: enterDuration * 0.65, ease: "power2.out", overwrite: "auto" },
         startDelay
       );
 
@@ -178,9 +187,9 @@ export default function Hero() {
     masterTimeline.to(
       meshes.map(({ mesh }) => mesh.scale),
       {
-        x: 1,
-        y: 1,
-        z: 1,
+        x: (i: number) => panels[i].scale,
+        y: (i: number) => panels[i].scale,
+        z: (i: number) => panels[i].scale,
         duration: 0.9,
         ease: "power4.out",
         stagger: 0.08,
@@ -190,11 +199,11 @@ export default function Hero() {
     masterTimeline.to(
       meshes.map(({ mesh }) => mesh.material),
       {
-        opacity: 1,
+        opacity: (i: number) => panels[i].opacity,
         duration: 0.6,
         ease: "power2.out",
         stagger: 0.08,
-      },
+      } as any,
       returnDelay
     );
 
@@ -228,29 +237,37 @@ export default function Hero() {
     >
       <div ref={canvasRef} className="absolute inset-0 z-10" />
       <h1
-        ref={textRef}
-        className="
-          hero-text
-          text-white
-          font-black
-          leading-[0.8]
-          tracking-[-0.08em]
-          text-[10vw]
-          select-none
-          uppercase
-          whitespace-nowrap
-          absolute
-          left-30
-          bottom-40
-          z-20
-        "
-      >
-        {letters.map((letter, index) => (
-          <span key={`${letter}-${index}`} className="inline-block">
-            {letter}
-          </span>
-        ))}
-      </h1>
+  ref={textRef}
+  className="
+    hero-text
+    text-white
+    font-black
+    leading-[0.75]
+    tracking-[-0.06em]
+    text-[26vw]
+    select-none
+    uppercase
+    whitespace-nowrap
+    absolute
+    left-10
+    bottom-10
+    z-20
+  "
+  style={{ fontFamily: "'Poppins', sans-serif" }}
+>
+  {letters.map((letter, index) => (
+    <span key={`${letter}-${index}`} className="inline-block">
+      {letter}
+    </span>
+  ))}
+</h1>
+
+<div className="absolute right-10 bottom-16 z-20 text-white max-w-sm">
+  <p className="text-2xl md:text-3xl font-semibold leading-snug">
+    Instantly Generate Stunning Product Images with AI
+  </p>
+</div>
+
     </section>
   );
 }

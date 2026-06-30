@@ -8,13 +8,13 @@ import { revealTextLines } from "@/utils/animations";
 gsap.registerPlugin(MotionPathPlugin);
 
 const sourceImages = [
-  "/Hero/black-and-white-1282260_640.jpg",
-  "/Hero/17262676116_8c01038595_o.webp",
-  "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
-  "/Hero/d8ad7528191005.5637110d93902.jpg",
-  "/Hero/woman-hiding-in-darkness-with-light-illuminating-face-photo.jpg",
-  "/Hero/17262676116_8c01038595_o.webp",
-  "/Hero/atmospheric-background-black-shadows-orange-260nw-2670220855.webp",
+  "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp",
+  "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp",
+  "/Hero/places-to-visit-in-mumbai-e1547692412795.jpg",
+  "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp",
+  "/Hero/MAG-SEPT16-mumbai-brian-pineda.webp",
+  "/Hero/places-to-visit-in-mumbai-e1547692412795.jpg",
+  "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp",
 ];
 
 const TRAIN_SIZE = 13;
