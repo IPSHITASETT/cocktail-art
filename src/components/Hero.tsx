@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import * as THREE from "three";
 
-const letters = "Cocktail".split("");
+const letters = "OVA".split("");
 
 // Each image gets its own scattered "landing spot" (in world units,
 // roughly centered but offset so they don't all converge to one point)
