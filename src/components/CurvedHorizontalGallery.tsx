@@ -231,6 +231,95 @@ function CurvedBand({
 }
 
 /* ------------------------------------------------------------------ */
+/*  MiddleGapBand — fills the space between the two curved bands      */
+/*  Reuses the same image set at low opacity, with centered text      */
+/* ------------------------------------------------------------------ */
+function MiddleGapBand({
+  heading,
+  subtitle,
+  height = 170,
+}: {
+  heading: string;
+  subtitle: string;
+  height?: number;
+}) {
+  const rowA: LaneConfig = { images: buildLane(12, 0), direction: "left", speed: 0.7 };
+  const rowB: LaneConfig = { images: buildLane(12, 3), direction: "right", speed: 0.6 };
+
+  return (
+    <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
+      {/* image layer, dimmed */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          opacity: 0.4,
+        }}
+      >
+        <div style={{ width: "100%", height: "50%" }}>
+          <Lane {...rowA} />
+        </div>
+        <div style={{ width: "100%", height: "50%" }}>
+          <Lane {...rowB} />
+        </div>
+      </div>
+
+      {/* darkening wash so text stays legible */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0.35), rgba(0,0,0,0.55))",
+        }}
+      />
+
+      {/* centered text overlay */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          pointerEvents: "none",
+          padding: "0 24px",
+        }}
+      >
+        <h2
+          style={{
+            color: "#fff",
+            fontSize: "clamp(34px, 6vw, 64px)",
+            fontWeight: 700,
+            letterSpacing: "0.02em",
+            margin: 0,
+            textTransform: "uppercase",
+          }}
+        >
+          {heading}
+        </h2>
+        <p
+          style={{
+            color: "rgba(255,255,255,0.8)",
+            fontSize: "clamp(15px, 1.8vw, 20px)",
+            marginTop: 12,
+            maxWidth: 620,
+            lineHeight: 1.5,
+          }}
+        >
+          {subtitle}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Exported section                                                  */
 /* ------------------------------------------------------------------ */
 export default function CurvedHorizontalGallery() {
@@ -240,8 +329,12 @@ export default function CurvedHorizontalGallery() {
   const rowD: LaneConfig = { images: buildLane(12, 3), direction: "right", speed: 1.0 };
 
   return (
-    <section style={{ position: "relative", width: "100%", background: "black", padding: "40px 0", display: "flex", flexDirection: "column", gap: 32, overflow: "hidden" }}>
+    <section style={{ position: "relative", width: "100%", background: "black", padding: "40px 0", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <CurvedBand rows={[rowA, rowB]} bow="down" />
+      <MiddleGapBand
+        heading="Frames In Motion"
+        subtitle="A visual journey through the city, one frame at a time."
+      />
       <CurvedBand rows={[rowC, rowD]} bow="up" />
     </section>
   );

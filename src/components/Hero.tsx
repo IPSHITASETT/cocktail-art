@@ -2,16 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import * as THREE from "three";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const letters = "OVA".split("");
 
 type ExitDir = "topLeft" | "left" | "top" | "bottom" | "right" | "topRight" | "bottomRight" | "centerRight";
 
-// Each image gets its own scattered "landing spot" (in world units,
-// roughly centered but offset so they don't all converge to one point),
-// its final scale/opacity, and now an explicit exitDir that controls
-// HOW it leaves the screen (instead of a generic left/right lane).
 const panels: {
   src: string;
   x: number;
@@ -21,21 +20,12 @@ const panels: {
   scale: number;
   opacity: number;
 }[] = [
-  // 1) Large box — exits TOP-LEFT, shifted lower (Remains fully opaque for main focus)
   { src: "/Hero/2a127375494db18dd2647353158c6c4a.jpg", x: -400, y: 75, z: 200, exitDir: "topLeft", scale: 1, opacity: 1 },
-  // 2) Medium box — exits LEFT, shifted lower (opacity lowered to 0.75 for premium look)
   { src: "/Hero/3356.jpg", x: -160, y: -115, z: 100, exitDir: "left", scale: 0.9, opacity: 0.75 },
-  // 3) Smaller box — exits TOP CENTER, shifted lower (opacity lowered to 0.7)
   { src: "/Hero/pngtree-car-driving-on-a-dark-road-image_16497858.jpg", x: 60, y: -265, z: 20, exitDir: "top", scale: 0.65, opacity: 0.7 },
-  
-  // 4) Small box — exits BOTTOM CENTER (opacity lowered to 0.6)
   { src: "/Hero/2a127375494db18dd2647353158c6c4a.jpg", x: 340, y: 20, z: -40, exitDir: "bottom", scale: 0.45, opacity: 0.6 },
-  // 5) Large-ish box — exits TOP CENTER (opacity lowered to 0.6)
   { src: "/Hero/3356.jpg", x: 235, y: -55, z: -100, exitDir: "top", scale: 0.55, opacity: 0.6 },
-  // 6) Tiny box — exits BOTTOM CENTER (opacity lowered to 0.5)
   { src: "/Hero/pngtree-car-driving-on-a-dark-road-image_16497858.jpg", x: 145, y: -110, z: -160, exitDir: "bottom", scale: 0.3, opacity: 0.5 },
-
-  // Repeats to keep the stream going — exit to the right sides (opacity adjusted for depth)
   { src: "/Hero/3356.jpg", x: -180, y: 50, z: -220, exitDir: "topRight", scale: 1.1, opacity: 0.4 },
   { src: "/Hero/pngtree-car-driving-on-a-dark-road-image_16497858.jpg", x: -50, y: -10, z: -280, exitDir: "bottomRight", scale: 0.8, opacity: 0.35 },
   { src: "/Hero/2a127375494db18dd2647353158c6c4a.jpg", x: 155, y: 35, z: -340, exitDir: "centerRight", scale: 0.4, opacity: 0.3 },
@@ -45,9 +35,10 @@ const panels: {
 export default function Hero() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const textRef = useRef<HTMLHeadingElement | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !sectionRef.current) return;
 
     const canvasContainer = canvasRef.current;
     const scene = new THREE.Scene();
@@ -80,8 +71,6 @@ export default function Hero() {
     const worldWidth = worldHeight * camera.aspect;
     const belowTextY = -worldHeight * 1.05;
 
-    // Custom shader for the 1st image only — reproduces the "clip-path strip
-    // wipe, staggered from center" reveal style (like the GSAP clipPath demo).
     const stripWipeVertex = `
       varying vec2 vUv;
       void main() {
@@ -139,7 +128,7 @@ export default function Hero() {
       const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(panel.x, panel.y, panel.z);
-      mesh.scale.set(0.01, 0.01, 0.01); // Initial scale set very small for smooth zoom-in
+      mesh.scale.set(0.01, 0.01, 0.01);
       scene.add(mesh);
       loader.load(panel.src, (tex) => {
         material.map = tex;
@@ -156,40 +145,47 @@ export default function Hero() {
     };
     animate();
 
-    // ---- TEXT REVEAL (once on mount) ----
+    // ---- TEXT INITIAL STATE (animation itself now lives inside masterTimeline below) ----
     const textSpans = textRef.current?.querySelectorAll("span") ?? [];
-    gsap.set(textSpans, { y: 80, opacity: 0 });
-    const textTween = gsap.to(textSpans, {
-      y: 0,
-      opacity: 1,
-      duration: 1.5,      // Slower animation duration
-      ease: "power3.out",
-      stagger: 0.2,       // Slower letter stagger
-    });
+    gsap.set(textSpans, { y: 70, opacity: 0, scale: 0.94, filter: "blur(10px)" });
 
-    const masterTimeline = gsap.timeline();
+    // ---- MASTER TIMELINE (text + panels together) — paused, driven by scroll direction ----
+    const masterTimeline = gsap.timeline({ paused: true });
     let latestExitEnd = 0;
+
+    // Text reveal folded into the same timeline so it reverses/repeats WITH the panels
+    textSpans.forEach((span, i) => {
+      masterTimeline.to(
+        span,
+        {
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          filter: "blur(0px)",
+          duration: 0.6,
+          ease: "power2.out",
+        },
+        i === 0 ? 0 : "-=0.18"
+      );
+    });
 
     meshes.forEach(({ mesh, panel, uniforms }, index) => {
       const isFirst = index === 0;
 
-      // ---- EXPLICIT FLUID RHYTHM CALCULATIONS ----
       let entryStart = 0;
       let thisEnterDuration = 0;
       let exitStart = 0;
       let thisExitDuration = 0;
 
       if (isFirst) {
-        entryStart = 0.2;          // Starts revealing immediately alongside the text
-        thisEnterDuration = 1.6;   // Slow & smooth entry reveal
-        exitStart = 1.8;           // Starts exit IMMEDIATELY upon finishing reveal (no pause)
-        thisExitDuration = 2.4;    // Slow, cinematic exit glide (ends at 4.2s)
+        entryStart = 0.2;
+        thisEnterDuration = 1.6;
+        exitStart = 1.8;
+        thisExitDuration = 2.4;
       } else {
-        // Remaining images start entering sequentially while the 1st image is still revealing
-        entryStart = 1.0 + (index - 1) * 0.25; 
+        entryStart = 1.0 + (index - 1) * 0.25;
         thisEnterDuration = 0.8;
-        // Remaining images start exiting sequentially DURING the 1st image's exit glide
-        exitStart = 2.4 + (index - 1) * 0.18; 
+        exitStart = 2.4 + (index - 1) * 0.18;
         thisExitDuration = 1.2;
       }
 
@@ -197,7 +193,6 @@ export default function Hero() {
       latestExitEnd = Math.max(latestExitEnd, exitEnd);
 
       if (isFirst) {
-        // ---- ENTER (1st image only): strip-wipe reveal IN PLACE
         masterTimeline.set(mesh.position, { x: panel.x, y: panel.y, z: panel.z }, entryStart);
         masterTimeline.set(mesh.scale, { x: panel.scale, y: panel.scale, z: panel.scale }, entryStart);
 
@@ -220,29 +215,27 @@ export default function Hero() {
           );
         }
       } else {
-        // ---- ENTER (images 2+): rise from below into place ----
         masterTimeline.set(mesh.position, { x: panel.x, y: belowTextY, z: panel.z }, entryStart);
-        masterTimeline.set(mesh.scale, { x: 0.01, y: 0.01, z: 0.01 }, entryStart); // Start scale small (0.01)
+        masterTimeline.set(mesh.scale, { x: 0.01, y: 0.01, z: 0.01 }, entryStart);
         masterTimeline.set(mesh.material, { opacity: 0 }, entryStart);
 
         masterTimeline.to(
           mesh.position,
-          { y: panel.y, duration: thisEnterDuration, ease: "power4.out", overwrite: "auto" }, // Premium deceleration curve
+          { y: panel.y, duration: thisEnterDuration, ease: "power4.out", overwrite: "auto" },
           entryStart
         );
         masterTimeline.to(
           mesh.scale,
-          { x: panel.scale, y: panel.scale, z: panel.scale, duration: thisEnterDuration, ease: "power4.out", overwrite: "auto" }, // Scales up to target scale smoothly
+          { x: panel.scale, y: panel.scale, z: panel.scale, duration: thisEnterDuration, ease: "power4.out", overwrite: "auto" },
           entryStart
         );
         masterTimeline.to(
           mesh.material,
-          { opacity: panel.opacity, duration: thisEnterDuration * 0.8, ease: "power3.out", overwrite: "auto" }, // Fades in smoothly to the lowered opacity value
+          { opacity: panel.opacity, duration: thisEnterDuration * 0.8, ease: "power3.out", overwrite: "auto" },
           entryStart
         );
       }
 
-      // ---- EXIT: direction-based movement + grow + fade, all together ----
       let exitX = panel.x;
       let exitY = panel.y;
       let exitZ = 1180;
@@ -265,19 +258,17 @@ export default function Hero() {
           break;
 
         case "top":
-          // Exit exactly through top-center - uniform scaling to prevent stretching
           exitX = 0;
           exitY = worldHeight * 0.75;
           targetScaleX = (worldHeight / 500) * 1.25;
-          targetScaleY = (worldHeight / 500) * 1.25; 
+          targetScaleY = (worldHeight / 500) * 1.25;
           break;
 
         case "bottom":
-          // Exit exactly through bottom-center - uniform scaling to prevent stretching
           exitX = 0;
           exitY = -worldHeight * 0.75;
           targetScaleX = (worldHeight / 500) * 1.25;
-          targetScaleY = (worldHeight / 500) * 1.25; 
+          targetScaleY = (worldHeight / 500) * 1.25;
           break;
 
         case "topRight":
@@ -298,7 +289,7 @@ export default function Hero() {
         case "right":
         default:
           exitX = worldWidth * 0.65;
-          exitY = panel.y * 0.5; // pull closer to center-right y=0
+          exitY = panel.y * 0.5;
           targetScaleX = panel.scale * 1.12;
           targetScaleY = panel.scale * 1.12;
           break;
@@ -344,76 +335,36 @@ export default function Hero() {
       }
     });
 
-    // ---- RETURN / REPEAT SEQUENCE ----
-    const returnDelay = latestExitEnd + 0.4;
-    masterTimeline.to(
-      meshes.map(({ mesh }) => mesh.position),
-      {
-        x: (i: number) => panels[i].x,
-        y: (i: number) => panels[i].y,
-        z: (i: number) => panels[i].z,
-        duration: 0.9,
-        ease: "power4.out",
-        stagger: 0.08,
-      } as any,
-      returnDelay
-    );
-    masterTimeline.to(
-      meshes.map(({ mesh }) => mesh.scale),
-      {
-        x: (i: number) => panels[i].scale,
-        y: (i: number) => panels[i].scale,
-        z: (i: number) => panels[i].scale,
-        duration: 0.9,
-        ease: "power4.out",
-        stagger: 0.08,
-      } as any,
-      returnDelay
-    );
-    masterTimeline.to(
-      meshes.filter((m) => !m.uniforms).map(({ mesh }) => mesh.material),
-      {
-        opacity: (i: number) => {
-          const nonShaderPanels = panels.filter((_, idx) => idx !== 0);
-          return nonShaderPanels[i].opacity;
-        },
-        duration: 0.6,
-        ease: "power2.out",
-        stagger: 0.08,
-      } as any,
-      returnDelay
-    );
-    if (meshes[0].uniforms) {
-      const firstUniforms = meshes[0].uniforms;
-      const returnFade = { value: 0 };
-      masterTimeline.to(
-        returnFade,
-        {
-          value: panels[0].opacity,
-          duration: 0.6,
-          ease: "power2.out",
-          overwrite: "auto",
-          onUpdate: () => {
-            firstUniforms.uOpacity.value = returnFade.value;
-          },
-        },
-        returnDelay
-      );
-    }
+    // ---- SCROLL-DIRECTION DRIVEN PLAYBACK ----
+    // scroll down into the section (from top, OR re-entering after a reverse) -> play forward
+    // scroll back up into the section (re-entering from the next section below) -> reverse smoothly
+    const heroTrigger = ScrollTrigger.create({
+      trigger: sectionRef.current,
+      start: "top top",
+      end: "bottom top",
+      onEnter: () => masterTimeline.play(),
+      onEnterBack: () => masterTimeline.reverse(),
+    });
+
+    // Hero is already in view on mount — kick off the very first play directly
+    // (covers the case where the trigger's start point is already satisfied
+    // at creation time, so onEnter may not fire on its own).
+    masterTimeline.play();
 
     const resize = () => {
       const { clientWidth, clientHeight } = canvasContainer;
       camera.aspect = clientWidth / clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(clientWidth, clientHeight);
+      ScrollTrigger.refresh();
     };
     window.addEventListener("resize", resize);
 
     return () => {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(frameId);
-      textTween.kill();
       masterTimeline.kill();
+      heroTrigger.kill();
       renderer.dispose();
       meshes.forEach(({ mesh }) => {
         mesh.geometry.dispose();
@@ -427,13 +378,12 @@ export default function Hero() {
 
   return (
     <section
+      ref={sectionRef}
       className="w-full bg-black relative overflow-hidden"
       style={{ height: "100vh" }}
     >
-      {/* 3D Canvas Layer */}
       <div ref={canvasRef} className="absolute inset-0 z-30 pointer-events-none" />
 
-      {/* --- HUGE HERO TEXT LAYER (Poppins style, restored to baseline bottom-10) --- */}
       <h1
         ref={textRef}
         className="
@@ -460,7 +410,6 @@ export default function Hero() {
         ))}
       </h1>
 
-      {/* --- TOP-RIGHT CONCEPT TEXT --- */}
       <div className="absolute top-10 right-10 z-20 flex gap-12 text-white select-none">
         <div className="flex flex-col gap-1 text-[11px] font-mono tracking-wider text-right">
           <span className="text-neutral-500">01 / CONCEPT</span>
@@ -476,13 +425,6 @@ export default function Hero() {
           </span>
         </div>
       </div>
-
-      {/* --- BOTTOM-RIGHT PARAGRAPH --- */}
-      {/* <div className="absolute right-10 bottom-16 z-20 text-white max-w-sm text-right select-none">
-        <p className="text-2xl md:text-3xl font-semibold leading-snug">
-          Welcome to art Gallery
-        </p>
-      </div> */}
     </section>
   );
 }
