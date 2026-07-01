@@ -17,10 +17,10 @@ const sourceImages = [
   "/Hero/Gateway-monument-India-entrance-Mumbai-Harbour-coast.webp",
 ];
 
-const TRAIN_SIZE = 13;
+const TRAIN_SIZE = 20; // barano holo - tight overlap e beshi car lagbe continuous flow er jonno
 
 const trainCars = Array.from({ length: TRAIN_SIZE }, (_, i) => ({
-  src: sourceImages[i % sourceImages.length],
+  src: sourceImages[i % sourceImages.length], // same images repeat cycle e
 }));
 
 export default function ProductShowcase() {
@@ -89,22 +89,30 @@ export default function ProductShowcase() {
 
       /* ---------------------------------------------------------
          2️⃣ Motion‑path train — starts only AFTER the last line
-         ("Visualization") has fully revealed. Cars are hidden
-         (opacity 0) until then, then fade in while following the
-         path, each one slightly staggered after the previous.
+         ("Visualization") has fully revealed. Cars start small
+         and faded (as if far away), grow to full size + opacity
+         as they travel along the path (depth/zoom-in feel), and
+         are tightly staggered so they overlap each other —
+         each new card stacking on top of (partially covering)
+         the previous one, like a layered deck.
          --------------------------------------------------------- */
       carsRef.current.forEach((car) => {
         if (!car) return;
-        gsap.set(car, { xPercent: -50, yPercent: -50, opacity: 0 });
+        gsap.set(car, { xPercent: -50, yPercent: -50, opacity: 0, scale: 0.5 });
       });
 
       carsRef.current.forEach((car, i) => {
         if (!car) return;
 
-        tl.to(
+        tl.fromTo(
           car,
           {
+            opacity: 0,
+            scale: 0.5,
+          },
+          {
             opacity: 1,
+            scale: 1,
             motionPath: {
               path: "#trainPath",
               align: "#trainPath",
@@ -115,11 +123,14 @@ export default function ProductShowcase() {
             },
             duration: 1.2,
             ease: "none",
+            onStart: () => {
+              gsap.set(car, { zIndex: i }); // porer card ta age rakha card er upore boshbe
+            },
           },
           // first car: no position param => sequential, so it only
           // starts once ALL the text tweens above have finished.
-          // rest of the cars stagger slightly off the previous one.
-          i === 0 ? undefined : "<0.15"
+          // rest of the cars are tightly staggered so they overlap.
+          i === 0 ? undefined : "<0.05"
         );
       });
 
@@ -212,7 +223,7 @@ export default function ProductShowcase() {
             ref={(el) => {
               if (el) carsRef.current[i] = el;
             }}
-            className="absolute w-[180px] h-[200px] md:w-[260px] md:h-[290px] rounded-2xl overflow-hidden"
+            className="absolute w-[220px] h-[250px] md:w-[340px] md:h-[380px] rounded-2xl overflow-hidden"
             style={{
               left: 0,
               top: 0,
