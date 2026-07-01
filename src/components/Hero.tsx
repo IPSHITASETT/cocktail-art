@@ -478,11 +478,11 @@ export default function Hero() {
       </div>
 
       {/* --- BOTTOM-RIGHT PARAGRAPH --- */}
-      <div className="absolute right-10 bottom-16 z-20 text-white max-w-sm text-right select-none">
+      {/* <div className="absolute right-10 bottom-16 z-20 text-white max-w-sm text-right select-none">
         <p className="text-2xl md:text-3xl font-semibold leading-snug">
           Welcome to art Gallery
         </p>
-      </div>
+      </div> */}
     </section>
   );
 }
